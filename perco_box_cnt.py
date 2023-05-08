@@ -3,6 +3,8 @@
 # Date: 2023/05/07
 # This script is created to study the fractal character of percolation flow
 
+import scipy
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import random
@@ -178,19 +180,74 @@ def box_cnt(bd, lss, N, w):
                     nodes.remove(k)
     return box_count
 
+# Models to be fitted
+def power_law(l, a, d):
+    return a*l**(-d)
+
+def poisson_dis(l, a, d):
+    #ff = a*math.exp(-l)*l**d/((2*3.14159*d)**0.5*(d/math.exp(1))**d)
+    ff = a*math.exp(-d)*d**l/((2*3.14159*l)**0.5*(l/math.exp(1))**l)
+    return ff
+
+# Getting R square
+def rsquare(number_of_boxes, popt, l, dis):
+    for k in range(len(l)):
+        residuals = []
+        rr = number_of_boxes[k] - dis(l[k],popt[0],popt[1])
+        residuals.append(rr**2)
+    squaresumofresiduals = np.sum(residuals)
+    squaresum = np.sum((number_of_boxes-np.mean(number_of_boxes))**2)
+    R2 = 1 - (squaresumofresiduals/squaresum)
+    return R2
+
 ############ Input Parameters ############
 N = 40 # Size of the matrix
-w = 10 # Split the boundary into w pieces
+wls = [2,30] # Split the boundary into w pieces
 prob = 0.5 # Probability of the flow
 
-#size = N*N # Size of the multiplied matrix
-#zz = np.zeros((N, N)) # Creating a zero matrix for the multiplied matrix
 cls = num_cluster(prob, N)[0]
 
 concat_list = [j for i in cls for j in i]
 lss = list(set(concat_list))
-for w in range(2, 30):
+number_of_boxes = []
+l = []
+for w in range(wls[0], wls[1]):
     bd = bd_nodes(N,w)
+    bc = box_cnt(bd, lss, N, w)
+    number_of_boxes.append(bc)
+    l.append(N/w)
     #print('The box is divided into', w)
     #print('The box length is then', N/w)
-    print('The number of boxes required', box_cnt(bd, lss, N, w))
+    #print('The number of boxes required', bc)
+
+poptpl, pcovpl = scipy.optimize.curve_fit(f=power_law, xdata=l, ydata=number_of_boxes, p0=(30, 2))
+
+poptpd, pcovpd = scipy.optimize.curve_fit(f=poisson_dis, xdata=l, ydata=number_of_boxes, p0=(30, 2))
+
+pl_y = []
+for i in l:
+    pl_y.append(power_law(i, poptpl[0], poptpl[1]))
+pd_y = []
+for i in l:
+    pd_y.append(poisson_dis(i, poptpd[0], poptpd[1]))
+
+R2pl = rsquare(number_of_boxes, poptpl, l, power_law)
+R2pd = rsquare(number_of_boxes, poptpl, l, poisson_dis)
+
+plt.scatter(l, number_of_boxes, label='Percolation simulation')
+plt.plot(l, pl_y, color='red', label='Power law')
+plt.plot(l, pd_y, color='green', label='Poisson distribution')
+plt.xlabel('Box Length')
+plt.ylabel('Number of Boxes')
+plt.legend()
+plt.show()
+
+
+print('----------Computed results-------------')
+print('The 2D lattice with the boundary length of {}'.format(N))
+print('The probability of the percolation is defined as {}'.format(prob))
+print('The lattice is divided into pieces from {} to {}'.format(wls[0],wls[1]))
+print('Power law fitted fractal dimension',poptpl[1])
+print('Poisson distribution fitted fractal dimension',poptpd[1])
+print('Power law R squared value', R2pl)
+print('Poisson distribution R squared vaule', R2pd)
