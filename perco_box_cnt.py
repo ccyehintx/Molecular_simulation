@@ -18,8 +18,8 @@ def chk_region(idx,N):
     ur = N - 1
     ll = N*N - N
     lr = N*N - 1
-    ulv = [1, N-1]
-    urv = [N-1, 2*N-1]
+    ulv = [1, N]
+    urv = [N-2, 2*N-1]
     llv = [(N-1)*N - N, N*N - N + 1]
     lrv = [N*N - 2, (N-1)*N - 1]
     all_cor = [ul, ur, ll, lr]
@@ -57,71 +57,15 @@ def chk_region(idx,N):
     return vv
 
 def num_cluster(prob, N):
-    bonding = []
-    size = N*N
-    bonding_id = []
-    cluster_id = []
-    cont = 0
+    bonding = [] # This stores all bonded configs
     for i in range(size):
         nei = chk_region(i, N)
-        group_id = -1
-        lump = [i]
         for j in nei:
             rand = random.random()
             if rand < prob:
                 if [j, i] not in bonding:
                     bonding.append([i, j])
-                    #cont = cont + 1
-                    lump.append(j)
-                    bonding_id.append(cont)
-                    cont = cont + 1
-
-    for i in range(cont):
-        group_id = -1
-        if i == 0:
-            cluster_id.append(bonding[i])
-        else:
-            for j in range(len(cluster_id)):
-                if any(x in bonding[i] for x in cluster_id[j]):
-                    group_id = j
-                    break
-            if group_id == -1:
-                cluster_id.append(bonding[i])
-            else:
-                for k in bonding[i]:
-                    cluster_id[group_id].append(k)
-
-    v2cluster_id = []
-    sep_count = []
-    for i in cluster_id:
-        ii = [*set(i)]
-        sep_count.append(len(ii))
-        v2cluster_id.append(ii)
-    sep_count.sort()
-    return v2cluster_id, len(v2cluster_id), sep_count, bonding
-
-def show_bonding(cluster, bonding):
-    ori = []
-    des = []
-    for i in cluster:
-        ori.append(list())
-        des.append(list())
-        for k in i:
-            j = bonding[k]
-            j1r = j[0]//N
-            j1c = (j[0]+1)%N - 1
-            if j1c == -1:
-                j1c = j1c + N
-            j1 = [j1r, j1c]
-            j2r = j[1]//N
-            j2c = (j[1]+1)%N - 1
-            if j2c == -1:
-                j2c = j2c + N
-            j2 = [j2r, j2c]
-            ori[-1].append(j1)
-            des[-1].append(j2)
-    return ori, des
-
+    return bonding
 
 def bd_nodes(N, w):
     # This function will give the boundary nodes for breakdown
@@ -204,16 +148,28 @@ def rsquare(number_of_boxes, popt, l, dis):
 N = 40 # Size of the matrix
 wls = [2,30] # Split the boundary into w pieces
 prob = 0.5 # Probability of the flow
+size = N*N
+bonding = num_cluster(prob, N)
 
-cls = num_cluster(prob, N)[0]
+G = nx.Graph()
 
-concat_list = [j for i in cls for j in i]
-lss = list(set(concat_list))
+for i in range(size):
+    G.add_node(i)
+
+for i in bonding:
+    G.add_edge(i[0],i[1])
+edge_list = G.edges() # List of all edges
+
+degree_ls = nx.degree(G) # List of degrees of all nodes
+
+big_cluster = list(nx.connected_components(G))
+
+concat_list = [j for i in big_cluster for j in i]
 number_of_boxes = []
 l = []
 for w in range(wls[0], wls[1]):
     bd = bd_nodes(N,w)
-    bc = box_cnt(bd, lss, N, w)
+    bc = box_cnt(bd, concat_list, N, w)
     number_of_boxes.append(bc)
     l.append(N/w)
     #print('The box is divided into', w)
